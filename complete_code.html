@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Main Page</title>
+    <style>
+        body {
+            font-family: "Verdana", sans-serif;
+            background-color: #2b2b2b;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 0;
+            line-height: 1.5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 22px;
+            color: #f0f0f0;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #444;
+            color: #e0e0e0;
+            border: 1px solid #777;
+            border-radius: 3px;
+            margin: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #555;
+        }
+
+        table {
+            width: 100%;
+            max-width: 1000px;
+            margin: 20px 0;
+            border-collapse: collapse;
+            background-color: #333;
+            color: #e0e0e0;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+        }
+
+        th, td {
+            padding: 10px;
+            border: 1px solid #555;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        th {
+            background-color: #444;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        /* Responsive adjustments */
+        @media only screen and (max-width: 600px) {
+            body {
+                font-size: 12px;
+            }
+
+            button {
+                padding: 8px 16px;
+                font-size: 12px;
+            }
+
+            table {
+                font-size: 12px;
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media only screen and (min-width: 600px) and (max-width: 768px) {
+            table {
+                font-size: 14px;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Main Page</h1>
+    <div class="button-group">
+        <button id="addRowButton">Add Row</button>
+        <button id="deleteButton">Delete</button>
+        <button id="researchButton">Research</button>
+        <button id="buttonsPageButton">Buttons</button>
+        <button id="marketButton">Market</button>
+        <button id="storageButton">Storage</button>
+    </div>
+    
+    <div id="totalValueContainer">
+        <p>Total BQB Value: <span id="totalBQBValue">0</span>BQB</p>
+        <p>Spendable BQB: <span id="spendableBQB">0</span>BQB</p>
+    </div>
+
+    <table id="planetTable">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Class</th>
+                <th>Planet</th>
+                <th>Planet Type</th>
+                <th>Moons</th>
+                <th>Moon Type</th>
+                <th>Asteroids</th>
+                <th>Asteroid Type</th>
+                <th>Total</th>
+                <th>Resource One</th>
+                <th>Resource Two</th>
+                <th>Resource Three</th>
+                <th>BQB Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Rows will be dynamically inserted here -->
+        </tbody>
+    </table>
+
+    <!-- Template for reusable rows -->
+    <template id="table-row-template">
+        <tr>
+            <td><input type="checkbox" class="row-checkbox"></td>
+            <td class="data-class"></td>
+            <td class="planet-data"></td>
+            <td class="planet-type"></td>
+            <td class="moon-data"></td>
+            <td class="moon-type"></td>
+            <td class="asteroid-data"></td>
+            <td class="asteroid-type"></td>
+            <td class="total-data"></td>
+            <td class="resource-one"></td>
+            <td class="resource-two"></td>
+            <td class="resource-three"></td>
+            <td class="bqb-value"></td>
+        </tr>
+    </template>
+    
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        // Utility functions
+        const getRandomNumber = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+        const getRandomType = (types) => types[getRandomNumber(0, types.length - 1)];
+
+        const updateDisplay = (selector, value) => $(selector).text(value);
+
+        const localStorageGet = (key, defaultValue) => {
+            const value = localStorage.getItem(key);
+            return value ? JSON.parse(value) : defaultValue;
+        };
+
+        const localStorageSet = (key, value) => localStorage.setItem(key, JSON.stringify(value));
+
+        // Main.js functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const $tbody = $('#planetTable tbody');
+            const $totalBQBValue = $('#totalBQBValue');
+            const $spendableBQB = $('#spendableBQB');
+            const localStorageKey = 'tableRows';
+
+            const typeModifiers = {
+                planet: { gas: 0.75, rock: 1, water: 1.25, "earth-like": 2.25 },
+                moon: {
+                    size: { small: 0.5, medium: 1, large: 1.5 },
+                    subtype: { gas: 0.75, rock: 1, water: 1.5 }
+                },
+                asteroid: { rock: 1, metallic: 5 }
+            };
+
+            const calculateValueTotal = (planet, moons, asteroids) => (planet * 2) + (moons * 1) + (asteroids * 0.5);
+
+            const applyModifiers = (value, conditions) => {
+                for (const condition of conditions) {
+                    if (condition.check(value)) {
+                        return value * condition.modifier;
+                    }
+                }
+                return value;
+            };
+
+            const calculateResource = (planet, moons, asteroids) => {
+                const resourceOneBase = 20;
+
+                const planetConditions = [
+                    { check: val => val >= 9 && val <= 16, modifier: 1.75 },
+                    { check: val => val >= 17 && val <= 20, modifier: 3 }
+                ];
+                const moonsConditions = [
+                    { check: val => val < 525, modifier: 1.1 },
+                    { check: val => val >= 526 && val <= 825, modifier: 1.475 },
+                    { check: val => val >= 826 && val <= 1000, modifier: 2.2 }
+                ];
+                const asteroidsConditions = [
+                    { check: val => val <= 6250, modifier: 1.05 },
+                    { check: val => val >= 6251 && val <= 8750, modifier: 1.25 },
+                    { check: val => val >= 8751 && val <= 10000, modifier: 1.75 }
+                ];
+
+                const resourceOne = applyModifiers(resourceOneBase, planetConditions);
+                const finalResourceOne = applyModifiers(resourceOne, moonsConditions);
+                return applyModifiers(finalResourceOne, asteroidsConditions);
+            };
+
+            const calculateResourceTwo = (planet, moons, asteroids) => calculateResource(planet, moons, asteroids) * 5;
+            const calculateResourceThree = (planet, moons, asteroids) => calculateResource(planet, moons, asteroids) * 50;
+
+            const updateTotalBQBValue = () => {
+                let totalBQBValue = 0;
+                $tbody.find('tr').each(function () {
+                    totalBQBValue += parseFloat($(this).find('td:last').text());
+                });
+                $totalBQBValue.text(totalBQBValue.toFixed(2));
+            };
+
+            const addResourcesToStorage = (resourceOne, resourceTwo, resourceThree) => {
+                let currentResourceOne = localStorageGet('resourceOneQty', 0);
+                let currentResourceTwo = localStorageGet('resourceTwoQty', 0);
+                let currentResourceThree = localStorageGet('resourceThreeQty', 0);
+
+                currentResourceOne += resourceOne;
+                currentResourceTwo += resourceTwo;
+                currentResourceThree += resourceThree;
+
+                localStorageSet('resourceOneQty', currentResourceOne);
+                localStorageSet('resourceTwoQty', currentResourceTwo);
+                localStorageSet('resourceThreeQty', currentResourceThree);
+            };
+
+            const updateSpendableBQB = (amount) => {
+                let currentSpendableBQB = localStorageGet('spendableBQB', 0);
+                currentSpendableBQB += amount;
+                localStorageSet('spendableBQB', currentSpendableBQB.toFixed(2));
+                $spendableBQB.text(currentSpendableBQB.toFixed(2));
+            };
+
+            const initializeSpendableBQB = () => {
+                const currentSpendableBQB = localStorageGet('spendableBQB', 0);
+                $spendableBQB.text(currentSpendableBQB.toFixed(2));
+            };
+
+            const createTableRow = (dataClass, planet, planetType, moons, moonType, asteroids, asteroidType, total, resourceOne, resourceTwo, resourceThree, bqbValue) => {
+                const template = document.getElementById('table-row-template').content.cloneNode(true);
+
+                template.querySelector('.data-class').textContent = dataClass;
+                template.querySelector('.planet-data').textContent = planet;
+                template.querySelector('.planet-type').textContent = planetType;
+                template.querySelector('.moon-data').textContent = moons;
+                template.querySelector('.moon-type').textContent = moonType;
+                template.querySelector('.asteroid-data').textContent = asteroids;
+                template.querySelector('.asteroid-type').textContent = asteroidType;
+                template.querySelector('.total-data').textContent = total;
+                template.querySelector('.resource-one').textContent = resourceOne;
+                template.querySelector('.resource-two').textContent = resourceTwo;
+                template.querySelector('.resource-three').textContent = resourceThree;
+                template.querySelector('.bqb-value').textContent = bqbValue;
+
+                return template;
+            };
+
+            const enableUpgradeButton = () => {
+                if ($tbody.children('tr').length > 11 && !$('#upgradeButton').length) {
+                    $('<button id="upgradeButton">Upgrade</button>').insertAfter('#addRowButton');
+                    $('.row-checkbox').prop('disabled', false);
+                }
+            };
+
+            document.addEventListener('click', (event) => {
+                if (event.target.matches('#addRowButton')) {
+                    const planet = getRandomNumber(2, 20);
+                    const moons = getRandomNumber(0, 1000);
+                    const asteroids = getRandomNumber(5000, 100000);
+                    const planetType = getRandomType(Object.keys(typeModifiers.planet));
+                    const moonType = `${getRandomType(Object.keys(typeModifiers.moon.size))} (${getRandomType(Object.keys(typeModifiers.moon.subtype))})`;
+                    const asteroidType = getRandomType(Object.keys(typeModifiers.asteroid));
+                    const total = planet + moons + asteroids;
+                    const resourceOne = calculateResource(planet, moons, asteroids);
+                    const resourceTwo = calculateResourceTwo(planet, moons, asteroids);
+                    const resourceThree = calculateResourceThree(planet, moons, asteroids);
+                    const bqbValue = calculateValueTotal(planet, moons, asteroids);
+
+                    const newRow = createTableRow('Class 1', planet, planetType, moons, moonType, asteroids, asteroidType, total, resourceOne, resourceTwo, resourceThree, bqbValue);
+                    $tbody.append(newRow);
+                    updateTotalBQBValue();
+                    saveTableState();
+                    enableUpgradeButton();
+                }
+
+                if (event.target.matches('#deleteButton')) {
+                    $('.row-checkbox:checked').closest('tr').remove();
+                    updateTotalBQBValue();
+                    saveTableState();
+                }
+
+                if (event.target.matches('#researchButton')) {
+                    window.location.href = '#'; // Add research logic here
+                }
+
+                if (event.target.matches('#buttonsPageButton')) {
+                    window.location.href = '#'; // Add buttons logic here
+                }
+
+                if (event.target.matches('#marketButton')) {
+                    window.location.href = '#'; // Add market logic here
+                }
+
+                if (event.target.matches('#storageButton')) {
+                    window.location.href = '#'; // Add storage logic here
+                }
+            });
+
+            const saveTableState = () => {
+                localStorageSet(localStorageKey, $tbody.html());
+            };
+
+            const loadTableState = () => {
+                const savedRows = localStorageGet(localStorageKey, '');
+                if (savedRows) $tbody.html(savedRows);
+                updateTotalBQBValue();
+            };
+
+            initializeSpendableBQB();
+            loadTableState();
+        });
+    </script>
+</body>
+</html>
+
